@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { useAppContext, currencies } from '../context/AppContext';
@@ -112,6 +113,9 @@ const Header: React.FC = () => {
                     <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-700 rounded-md shadow-lg py-1 z-50 ring-1 ring-black ring-opacity-5 dark:ring-white dark:ring-opacity-10">
                       {user.isOwner && (
                          <Link to="/admin" onClick={() => setIsUserMenuOpen(false)} className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-600">{t('header.admin')}</Link>
+                      )}
+                      {user.role === UserRole.Farmer && (
+                        <Link to={`/farms/${user.id}`} onClick={() => setIsUserMenuOpen(false)} className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-600">{t('farmDetail.myFarm')}</Link>
                       )}
                       {(user.role === UserRole.Buyer || user.role === UserRole.Farmer) && (
                          <Link to="/dashboard" onClick={() => setIsUserMenuOpen(false)} className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-600">{t('header.dashboard')}</Link>
