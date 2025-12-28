@@ -1,5 +1,4 @@
 
-
 import React, { useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { useAppContext, currencies } from '../context/AppContext';
@@ -104,9 +103,16 @@ const Header: React.FC = () => {
             {/* User Auth Section */}
             {user ? (
                 <div className="relative">
-                  <button onClick={() => setIsUserMenuOpen(!isUserMenuOpen)} className="flex items-center space-x-2 text-gray-600 hover:text-primary dark:text-gray-300">
-                    <UserCircleIcon className="w-8 h-8" />
-                    <span className="hidden sm:inline font-medium">Hi, {user.fullName.split(' ')[0]}</span>
+                  <button onClick={() => setIsUserMenuOpen(!isUserMenuOpen)} className="flex items-center space-x-2 text-gray-600 hover:text-primary dark:text-gray-300 group">
+                    {user.profilePhoto ? (
+                        <img src={user.profilePhoto} alt={user.fullName} className="w-9 h-9 rounded-full border-2 border-primary object-cover group-hover:scale-105 transition-transform" />
+                    ) : (
+                        <UserCircleIcon className="w-9 h-9" />
+                    )}
+                    <div className="hidden sm:flex flex-col items-start leading-tight">
+                        <span className="font-bold text-sm">Hi, {user.fullName.split(' ')[0]}</span>
+                        {user.farmName && <span className="text-[10px] text-gray-400 font-medium truncate max-w-[100px]">{user.farmName}</span>}
+                    </div>
                     <ChevronDownIcon className="w-4 h-4" />
                   </button>
                   {isUserMenuOpen && (

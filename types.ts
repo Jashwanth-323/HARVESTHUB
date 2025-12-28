@@ -63,6 +63,8 @@ export interface User {
   deliveryAddress?: Address;
   walletBalance?: number;
   // Farmer-specific fields
+  farmName?: string;     // Added for detailed profile
+  profilePhoto?: string; // Added for detailed profile (Base64)
   farmLocation?: string;
   farmDistrict?: string; // Structured location for farmers
   farmCity?: string;     // Structured location for farmers

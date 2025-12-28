@@ -45,7 +45,7 @@ const DashboardPage: React.FC = () => {
 //      FARMER DASHBOARD
 // ==================================
 const FarmerDashboard = () => {
-    const { user, logout, farmerProducts, farmerOrders, farmerAddProduct, farmerUpdateProduct, farmerDeleteProduct, formatPrice, showNotification } = useAppContext();
+    const { user, logout, farmerProducts, farmerOrders, farmerAddProduct, farmerUpdateProduct, formatPrice, showNotification } = useAppContext();
     const { t } = useLanguage();
     const [activeTab, setActiveTab] = useState('products');
 
@@ -53,25 +53,41 @@ const FarmerDashboard = () => {
         farmerProducts.filter(p => p.isEnabled && p.stock < STOCK_THRESHOLD).length,
     [farmerProducts]);
 
+    const isProfileIncomplete = !user?.profilePhoto || !user?.farmName;
+
     const renderContent = () => {
         switch (activeTab) {
             case 'products':
-                return <FarmerProducts products={farmerProducts} onAdd={farmerAddProduct} onUpdate={farmerUpdateProduct} onDelete={farmerDeleteProduct} formatPrice={formatPrice} showNotification={showNotification} t={t} />;
+                return <FarmerProducts products={farmerProducts} onAdd={farmerAddProduct} onUpdate={farmerUpdateProduct} formatPrice={formatPrice} showNotification={showNotification} t={t} />;
             case 'orders':
                 return <FarmerOrders orders={farmerOrders} formatPrice={formatPrice} />;
             case 'profile':
                 return <ProfileManagement />;
             default:
-                return <FarmerProducts products={farmerProducts} onAdd={farmerAddProduct} onUpdate={farmerUpdateProduct} onDelete={farmerDeleteProduct} formatPrice={formatPrice} showNotification={showNotification} t={t} />;
+                return <FarmerProducts products={farmerProducts} onAdd={farmerAddProduct} onUpdate={farmerUpdateProduct} formatPrice={formatPrice} showNotification={showNotification} t={t} />;
         }
     };
     
     return (
         <div className="flex h-screen bg-gray-100 font-sans">
-            <Sidebar onTabChange={setActiveTab} activeTab={activeTab} lowStockCount={lowStockCount} />
+            <Sidebar onTabChange={setActiveTab} activeTab={activeTab} lowStockCount={lowStockCount} isProfileIncomplete={isProfileIncomplete} />
             <div className="flex-1 flex flex-col">
                 <Header title="Farmer Dashboard" user={user} />
                 <main className="flex-1 p-8 overflow-y-auto">
+                    {/* Profile Completion Reminder */}
+                    {isProfileIncomplete && (
+                        <div className="bg-primary/10 border-l-4 border-primary p-4 rounded-xl mb-8 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <UserCircleIcon className="w-6 h-6 text-primary" />
+                                <div>
+                                    <p className="font-bold text-gray-800">Complete Your Farmer Profile</p>
+                                    <p className="text-sm text-gray-600">Upload a photo and set your farm name to build trust with buyers.</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setActiveTab('profile')} className="px-4 py-2 bg-primary text-white rounded-lg font-bold hover:bg-primary-dark transition-colors">Setup Now</button>
+                        </div>
+                    )}
+
                     {/* Persistent Dashboard Stats Overlay */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                         <StatCard icon={<PackageIcon className="w-8 h-8 text-primary"/>} label={t('dashboard.totalProducts')} value={farmerProducts.length} />
@@ -136,7 +152,7 @@ const BuyerDashboard = () => {
 // ==================================
 //      SHARED COMPONENTS
 // ==================================
-const Sidebar = ({ onTabChange, activeTab, lowStockCount }: { onTabChange: (tab: string) => void, activeTab: string, lowStockCount?: number}) => {
+const Sidebar = ({ onTabChange, activeTab, lowStockCount, isProfileIncomplete }: { onTabChange: (tab: string) => void, activeTab: string, lowStockCount?: number, isProfileIncomplete?: boolean}) => {
     const { user, logout } = useAppContext();
     const { t } = useLanguage();
     const isFarmer = user?.role === UserRole.Farmer;
@@ -146,7 +162,7 @@ const Sidebar = ({ onTabChange, activeTab, lowStockCount }: { onTabChange: (tab:
         ? [
             { id: 'products', label: t('dashboard.products'), icon: <PackageIcon className="w-6 h-6" />, internal: true, badge: lowStockCount }, 
             { id: 'orders', label: t('dashboard.orders'), icon: <ClipboardListIcon className="w-6 h-6" />, internal: true }, 
-            { id: 'profile', label: t('dashboard.profile'), icon: <UserCircleIcon className="w-6 h-6" />, internal: true },
+            { id: 'profile', label: t('dashboard.profile'), icon: <UserCircleIcon className="w-6 h-6" />, internal: true, warning: isProfileIncomplete },
             ...(user?.isOwner ? [{ id: 'admin', label: t('header.admin'), icon: <UserGroupIcon className="w-6 h-6" />, path: '/admin', internal: false }] : [])
           ]
         : [{ id: 'orders', label: t('dashboard.myOrders'), icon: <ClipboardListIcon className="w-6 h-6" />, internal: true }, { id: 'profile', label: t('dashboard.profileSettings'), icon: <UserCircleIcon className="w-6 h-6" />, internal: true }];
@@ -161,7 +177,7 @@ const Sidebar = ({ onTabChange, activeTab, lowStockCount }: { onTabChange: (tab:
             <nav className="flex-1 px-4 py-6 space-y-2">
                 {navItems.map(item => (
                     item.internal ? (
-                        <SidebarButton key={item.id} icon={item.icon} label={item.label} active={activeTab === item.id} onClick={() => onTabChange(item.id)} badge={item.badge} />
+                        <SidebarButton key={item.id} icon={item.icon} label={item.label} active={activeTab === item.id} onClick={() => onTabChange(item.id)} badge={item.badge} warning={item.warning} />
                     ) : (
                         <NavLink 
                             to={item.path as string} 
@@ -195,13 +211,15 @@ interface SidebarButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
     label: string;
     active: boolean;
     badge?: number;
+    warning?: boolean;
 }
 
-const SidebarButton: React.FC<SidebarButtonProps> = ({ icon, label, active, onClick, badge, ...rest }) => (
+const SidebarButton: React.FC<SidebarButtonProps> = ({ icon, label, active, onClick, badge, warning, ...rest }) => (
     <button onClick={onClick} className={`w-full flex items-center justify-between px-4 py-3 rounded-lg transition-colors text-base font-medium ${active ? 'bg-primary text-white shadow' : 'hover:bg-gray-200'}`} {...rest}>
         <div className="flex items-center space-x-3">
             {icon}
             <span>{label}</span>
+            {warning && <span className="w-2 h-2 bg-secondary rounded-full animate-pulse"></span>}
         </div>
         {badge !== undefined && badge > 0 && (
             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${active ? 'bg-white text-primary' : 'bg-red-500 text-white'}`}>
@@ -215,9 +233,18 @@ const Header = ({ title, user }: { title: string, user: User | null }) => {
     return (
         <header className="bg-white shadow-sm h-20 flex items-center justify-between px-8 border-b">
             <h1 className="text-2xl font-bold text-gray-800">{title}</h1>
-            <div className="text-right">
-                <p className="font-semibold">{user?.fullName}</p>
-                <p className="text-sm text-gray-500">{user?.role} {user?.role === UserRole.Farmer && user.farmerType ? ` (${user.farmerType})` : ''}</p>
+            <div className="text-right flex items-center gap-3">
+                <div className="text-right">
+                    <p className="font-semibold">{user?.fullName}</p>
+                    <p className="text-sm text-gray-500">{user?.role} {user?.role === UserRole.Farmer && user.farmerType ? ` (${user.farmerType})` : ''}</p>
+                </div>
+                {user?.profilePhoto ? (
+                    <img src={user.profilePhoto} alt={user.fullName} className="w-10 h-10 rounded-full border-2 border-primary shadow-sm" />
+                ) : (
+                    <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center border-2 border-gray-200">
+                        <UserCircleIcon className="w-6 h-6 text-gray-400" />
+                    </div>
+                )}
             </div>
         </header>
     );
@@ -291,7 +318,7 @@ const FarmerOrders = ({ orders, formatPrice }: { orders: Order[], formatPrice: (
 
 
 // --- Farmer: Products Panel ---
-const FarmerProducts = ({ products, onAdd, onUpdate, onDelete, formatPrice, showNotification, t }: { products: Product[], onAdd: any, onUpdate: any, onDelete: any, formatPrice: (p: number) => string, showNotification: (msg: string, type: 'success' | 'error') => void, t: (key: string, replacements?: { [key: string]: string | number }) => string}) => {
+const FarmerProducts = ({ products, onAdd, onUpdate, formatPrice, showNotification, t }: { products: Product[], onAdd: any, onUpdate: any, formatPrice: (p: number) => string, showNotification: (msg: string, type: 'success' | 'error') => void, t: (key: string, replacements?: { [key: string]: string | number }) => string}) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
     const [priceSuggestionModal, setPriceSuggestionModal] = useState<{ product: Product, suggestedPrice: number, reason: string } | null>(null);
@@ -520,7 +547,6 @@ const FarmerProducts = ({ products, onAdd, onUpdate, onDelete, formatPrice, show
                                                     )}
                                                 </button>
                                                 <button onClick={() => handleEditClick(p)} className="p-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-all"><PencilIcon className="w-5 h-5"/></button>
-                                                <button onClick={() => onDelete(p.id)} className="p-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 transition-all"><TrashIcon className="w-5 h-5"/></button>
                                                 <button onClick={() => setSelectedProductForDetails(p)} className="p-2 bg-gray-50 text-gray-600 rounded-xl hover:bg-gray-100 transition-all">
                                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
                                                         <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639l4.418-5.523a1.875 1.875 0 0 1 2.652-.64l.564.282a1.875 1.875 0 0 0 2.652-.64l4.418-5.523a1.012 1.012 0 0 1 0 .639l-4.418 5.523a1.875 1.875 0 0 1-2.652.64l-.564-.282a1.875 1.875 0 0 0-2.652.64L2.036 12.322Z" />
@@ -544,6 +570,10 @@ const FarmerProducts = ({ products, onAdd, onUpdate, onDelete, formatPrice, show
                         )}
                     </div>
                 )}
+            </div>
+            <div className="bg-blue-50 p-4 rounded-xl border border-blue-200 flex items-center gap-3">
+               <AlertTriangleIcon className="w-5 h-5 text-blue-600" />
+               <p className="text-xs text-blue-700 font-medium">Note: Product removal is restricted to platform administrators only. If you need to permanently remove an item, please contact support or deactivate it by setting stock to 0.</p>
             </div>
         </div>
     );
@@ -705,7 +735,7 @@ const ProductForm = ({ product, onSave, onCancel, showNotification, t }: { produ
 
 // --- Shared: Profile Panel ---
 const ProfileManagement = () => {
-    const { user, updateUserProfile } = useAppContext();
+    const { user, updateUserProfile, showNotification } = useAppContext();
     const [formData, setFormData] = useState<User | null>(user);
 
     useEffect(() => { setFormData(user) }, [user]);
@@ -715,6 +745,21 @@ const ProfileManagement = () => {
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setFormData(prev => prev ? { ...prev, [name]: value } : null);
+    };
+
+    const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            if (file.size > 2 * 1024 * 1024) {
+                showNotification('Image size must be less than 2MB.', 'error');
+                return;
+            }
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setFormData(prev => prev ? { ...prev, profilePhoto: reader.result as string } : null);
+            };
+            reader.readAsDataURL(file);
+        }
     };
 
     const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -731,13 +776,56 @@ const ProfileManagement = () => {
         <div className="bg-white p-6 rounded-lg shadow-md">
             <h2 className="text-2xl font-semibold mb-6">Profile Settings</h2>
             <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <FormInput name="fullName" label="Full Name" value={formData.fullName} onChange={handleChange} />
-                    <FormInput name="email" type="email" label="Email" value={formData.email} onChange={handleChange} disabled />
-                    <FormInput name="mobile" label="Mobile" type="tel" value={formData.mobile} onChange={handleChange} />
+                <div className="flex flex-col md:flex-row items-start gap-8 border-b pb-8">
+                    <div className="flex flex-col items-center">
+                        <div className="relative group">
+                            {formData.profilePhoto ? (
+                                <img src={formData.profilePhoto} alt={formData.fullName} className="w-32 h-32 rounded-full object-cover border-4 border-primary shadow-lg" />
+                            ) : (
+                                <div className="w-32 h-32 rounded-full bg-gray-100 flex items-center justify-center border-4 border-gray-200">
+                                    <UserCircleIcon className="w-16 h-16 text-gray-400" />
+                                </div>
+                            )}
+                            <label className="absolute inset-0 bg-black/40 text-white flex items-center justify-center rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                                <span className="text-xs font-bold">Change Photo</span>
+                                <input type="file" className="hidden" accept="image/*" onChange={handlePhotoChange} />
+                            </label>
+                        </div>
+                        <p className="text-[10px] text-gray-500 mt-2 uppercase tracking-tighter">Click to update</p>
+                    </div>
+
+                    <div className="flex-1 w-full grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <FormInput name="fullName" label="Full Name" value={formData.fullName} onChange={handleChange} required />
+                        {formData.role === UserRole.Farmer && (
+                            <FormInput name="farmName" label="Farm Name" value={formData.farmName || ''} onChange={handleChange} required />
+                        )}
+                        <FormInput name="email" type="email" label="Email" value={formData.email} onChange={handleChange} disabled />
+                        <FormInput name="mobile" label="Mobile" type="tel" value={formData.mobile} onChange={handleChange} required />
+                    </div>
                 </div>
-                 <div className="pt-4 border-t">
-                     <h3 className="text-xl font-semibold mb-4">Delivery Address</h3>
+
+                {formData.role === UserRole.Farmer && (
+                    <div className="pt-4 border-b pb-8">
+                        <h3 className="text-xl font-semibold mb-4">Farm Profile</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <FormInput name="farmLocation" label="Detailed Location" value={formData.farmLocation || ''} onChange={handleChange} placeholder="Village/Taluk/District" />
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Type of Farming</label>
+                                <select name="farmerType" value={formData.farmerType} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md">
+                                    {Object.values(OrderStatus).map(type => <option key={type} value={type}>{type}</option>)}
+                                    <option value="Vegetables">Vegetables</option>
+                                    <option value="Fruits">Fruits</option>
+                                    <option value="Grains">Grains</option>
+                                    <option value="Organic">Organic</option>
+                                    <option value="Mixed">Mixed</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                 <div className="pt-4">
+                     <h3 className="text-xl font-semibold mb-4">Delivery / Business Address</h3>
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                          <FormInput name="street" label="Street" value={formData.deliveryAddress?.street || ''} onChange={handleAddressChange} />
                          <FormInput name="city" label="City" value={formData.deliveryAddress?.city || ''} onChange={handleAddressChange} />
@@ -745,8 +833,8 @@ const ProfileManagement = () => {
                          <FormInput name="pincode" label="Pincode" value={formData.deliveryAddress?.pincode || ''} onChange={handleAddressChange} />
                      </div>
                  </div>
-                 <div className="flex justify-end pt-4">
-                     <button type="submit" className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark">Save Changes</button>
+                 <div className="flex justify-end pt-8 border-t">
+                     <button type="submit" className="px-8 py-3 bg-primary text-white rounded-full font-bold shadow-lg hover:bg-primary-dark transition-all transform hover:scale-105 active:scale-95">Save Changes</button>
                  </div>
             </form>
         </div>

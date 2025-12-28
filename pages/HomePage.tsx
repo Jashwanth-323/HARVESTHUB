@@ -10,12 +10,12 @@ const HomePage: React.FC = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const { user, products } = useAppContext(); // Access products from context
-  const featuredProductIds = ['p2', 'p5', 'p7', 'p11'];
-  const featuredProducts = products.filter(p => featuredProductIds.includes(p.id));
+  
+  // Filtered categories for the landing page tiles
+  const homeCategories = categories.filter(cat => cat.name === 'Vegetables' || cat.name === 'Fruits');
   
   const vegetableProducts = products.filter(p => p.category === 'Vegetables').slice(0, 4);
   const fruitProducts = products.filter(p => p.category === 'Fruits').slice(0, 4);
-  const grainsProducts = products.filter(p => p.category === 'Grains').slice(0, 4);
 
   const handleShopNow = () => {
     if (user) {
@@ -49,16 +49,16 @@ const HomePage: React.FC = () => {
         </div>
       </section>
 
-      {/* Categories Section */}
+      {/* Categories Section - Filtered to Vegetables and Fruits only */}
       <section className="py-16">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-3xl font-bold text-center text-gray-800 mb-10">{t('home.categories.title')}</h2>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
-            {categories.map(category => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 max-w-4xl mx-auto">
+            {homeCategories.map(category => (
               <Link key={category.id} to={`/shop?category=${category.name}`} className="group relative rounded-lg overflow-hidden shadow-lg transform hover:-translate-y-2 transition-transform duration-300">
-                <img src={category.imageUrl} alt={category.name} className="w-full h-40 object-cover" />
+                <img src={category.imageUrl} alt={category.name} className="w-full h-56 object-cover" />
                 <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                  <h3 className="text-2xl font-semibold text-white">{category.name}</h3>
+                  <h3 className="text-3xl font-semibold text-white">{category.name}</h3>
                 </div>
               </Link>
             ))}
@@ -96,37 +96,13 @@ const HomePage: React.FC = () => {
         </div>
       </section>
 
-      {/* Featured Products Section */}
-      <section className="py-16 bg-light-green">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-bold text-center text-gray-800 mb-10">{t('home.featured.title')}</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-            {featuredProducts.map(product => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
-           <div className="text-center mt-12">
-            <Link to="/shop?view=all" className="bg-primary text-white font-semibold py-3 px-8 rounded-lg hover:bg-primary-dark transition-colors duration-300">
-                View All Products
-            </Link>
-          </div>
-        </div>
-      </section>
-
-       {/* Grains Section */}
-      <section className="py-16">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-bold text-center text-gray-800 mb-10">{t('home.grains.title')}</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-            {grainsProducts.map(product => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
-          <div className="text-center mt-12">
-            <Link to="/shop?category=Grains" className="bg-primary text-white font-semibold py-3 px-8 rounded-lg hover:bg-primary-dark transition-colors duration-300">
-                View All Grains
-            </Link>
-          </div>
+      {/* Final Call to Action */}
+      <section className="py-20 bg-primary/5">
+        <div className="container mx-auto px-4 text-center">
+          <h2 className="text-3xl font-bold text-gray-800 mb-6">Ready to taste farm freshness?</h2>
+          <Link to="/shop?view=all" className="inline-block bg-primary text-white font-bold py-4 px-10 rounded-full hover:bg-primary-dark transition-all transform hover:scale-105 shadow-xl">
+             Explore Full Catalog
+          </Link>
         </div>
       </section>
     </div>

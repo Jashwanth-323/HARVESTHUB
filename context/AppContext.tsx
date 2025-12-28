@@ -49,6 +49,7 @@ const initialUsers: User[] = [
     mobile: '1234567890', 
     role: UserRole.Buyer, 
     isActive: true, 
+    isVerified: true,
     deliveryAddress: { 
         fullName: 'John Doe', 
         phone: '1234567890', 
@@ -69,6 +70,8 @@ const initialUsers: User[] = [
     mobile: '0987654321', 
     role: UserRole.Farmer, 
     isActive: true, 
+    isVerified: true,
+    farmName: 'Green Valley Farms',
     farmLocation: 'Green Valley, Mysuru', 
     farmCity: 'Mysuru',
     farmDistrict: 'Mysuru',
@@ -76,8 +79,8 @@ const initialUsers: User[] = [
     farmerType: FarmerType.Vegetables, 
     paymentDetails: { upiId: 'jane@farm' } 
   },
-  { id: 'u3', fullName: 'Market Owner', email: 'owner@example.com', password: 'password123', mobile: '5555555555', role: UserRole.Buyer, isActive: true, isOwner: true, deliveryAddress: { fullName: 'Market Owner', phone: '5555555555', street: '1 Market Rd', city: 'Big City', district: 'Big District', state: 'New York', country: 'USA', pincode: '54321' } },
-  { id: 'u_admin', fullName: 'Admin User', email: 'admin@example.com', password: 'admin@123', mobile: '1112223334', role: UserRole.Admin, isActive: true, isOwner: true },
+  { id: 'u3', fullName: 'Market Owner', email: 'owner@example.com', password: 'password123', mobile: '5555555555', role: UserRole.Buyer, isActive: true, isVerified: true, isOwner: true, deliveryAddress: { fullName: 'Market Owner', phone: '5555555555', street: '1 Market Rd', city: 'Big City', district: 'Big District', state: 'New York', country: 'USA', pincode: '54321' } },
+  { id: 'u_admin', fullName: 'Admin User', email: 'admin@example.com', password: 'admin@123', mobile: '1112223334', role: UserRole.Admin, isActive: true, isVerified: true, isOwner: true },
 ];
 
 interface AppContextType {
@@ -101,7 +104,6 @@ interface AppContextType {
   login: (email: string, password: string, rememberMe: boolean) => void;
   logout: () => void;
   signupActual: (userData: Omit<User, 'id' | 'isActive'>) => User | undefined;
-  forgotPassword: (email: string) => void;
   updateUserProfile: (userData: User) => void;
   placeOrder: (shippingAddress: Address, paymentMethod: string) => boolean;
   customerOrders: Order[];
@@ -110,13 +112,12 @@ interface AppContextType {
   farmerOrders: Order[];
   farmerAddProduct: (productData: Omit<Product, 'id' | 'farmerId'>) => void;
   farmerUpdateProduct: (productData: Product) => void;
-  farmerDeleteProduct: (productId: string) => void;
   allUsers: User[];
   farmersList: User[];
   adminUpdateUserStatus: (userId: string, newStatus: boolean) => void;
   adminAddProduct: (productData: Omit<Product, 'id'>) => void;
   adminUpdateProduct: (productData: Product) => void;
-  adminDeleteProduct: (productId: string) => void;
+  adminDeleteProduct: (productId: string, reason?: string) => void;
   auditLogs: AuditLog[];
   addAuditLog: (action: string, details: string, logUser?: User) => void;
 }
@@ -156,6 +157,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // --- Persistence Sync Hooks ---
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(products));
+    setCart(prev => prev.filter(item => products.some(p => p.id === item.product.id)));
   }, [products]);
 
   useEffect(() => {
@@ -306,9 +308,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const cartCount = useMemo(() => cart.reduce((total, item) => total + item.quantity, 0), [cart]);
   const cartTotal = useMemo(() => cart.reduce((total, item) => total + item.product.price * item.quantity, 0), [cart]);
 
-  // --- Auth ---
+  // --- Auth & Verification Logic ---
   const login = useCallback((email: string, password: string, rememberMe: boolean) => {
-    const foundUser = users.find(u => u.email === email && u.password === password);
+    const foundUser = users.find(u => (u.email === email || u.mobile === email) && u.password === password);
     if (foundUser) {
         if (!foundUser.isActive) {
             showNotification('Your account has been blocked.', 'error');
@@ -336,35 +338,39 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         showNotification('An account with this email already exists.', 'error');
         return undefined;
     }
+    if (users.some(u => u.mobile === userData.mobile)) {
+        showNotification('An account with this mobile number already exists.', 'error');
+        return undefined;
+    }
+
     const newUser: User = {
         ...userData,
         id: `u${Date.now()}`,
         isActive: true,
+        isVerified: true, // Verification removed
         walletBalance: 0,
     };
+    
     setUsers(prev => [...prev, newUser]);
-    setUser(newUser);
-    addAuditLog('User Signup', `New user ${newUser.fullName} registered as a ${newUser.role}.`, newUser);
-    showNotification(t('auth.signupSuccess', {fullName: newUser.fullName}), 'success');
+    setUser(newUser); // Auto-login
+    
+    addAuditLog('User Signup', `New user ${newUser.fullName} registered.`, newUser);
+    showNotification(`Account created successfully!`, 'success');
     sendConfirmationSms(newUser.mobile, newUser.fullName).catch(console.error);
+    
     return newUser;
-  }, [users, showNotification, addAuditLog, t]);
-
-  const forgotPassword = useCallback((email: string) => {
-    const foundUser = users.find(u => u.email === email);
-    if (foundUser) showNotification(`Password reset link sent to ${email}.`, 'success');
-    else showNotification(`No account found for ${email}.`, 'error');
-  }, [users, showNotification]);
+  }, [users, showNotification, addAuditLog]);
 
   const updateUserProfile = useCallback((userData: User) => {
-    if (!user || user.id !== userData.id) return;
-    setUser(userData);
     setUsers(prev => prev.map(u => u.id === userData.id ? userData : u));
+    if (user && user.id === userData.id) {
+        setUser(userData);
+    }
     addAuditLog('Profile Update', `User ${userData.fullName} updated their profile.`, userData);
     showNotification('Profile updated successfully.', 'success');
   }, [user, showNotification, addAuditLog]);
 
-  // --- Orders ---
+  // --- Order Logic ---
   const placeOrder = useCallback((shippingAddress: Address, paymentMethod: string): boolean => {
     if (!user || cart.length === 0) return false;
     for (const item of cart) {
@@ -430,12 +436,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     showNotification('Product updated.', 'success');
   }, [showNotification]);
 
-  const farmerDeleteProduct = useCallback((productId: string) => {
-    setProducts(prev => prev.filter(p => p.id !== productId));
-    showNotification('Product deleted.', 'success');
-  }, [showNotification]);
-
-  // --- Admin ---
+  // --- Admin Logic ---
   const adminUpdateUserStatus = useCallback((userId: string, newStatus: boolean) => {
     setUsers(prev => prev.map(u => u.id === userId ? { ...u, isActive: newStatus } : u));
     if (user?.id === userId) setUser(prev => prev ? { ...prev, isActive: newStatus } : null);
@@ -453,10 +454,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     showNotification('Product updated.', 'success');
   }, [showNotification]);
 
-  const adminDeleteProduct = useCallback((productId: string) => {
-    setProducts(prev => prev.filter(p => p.id !== productId));
-    showNotification('Product deleted.', 'success');
-  }, [showNotification]);
+  const adminDeleteProduct = useCallback((productId: string, reason: string = 'Administrative Decision') => {
+    if (!user || (user.role !== UserRole.Admin && !user.isOwner)) {
+        showNotification('Unauthorized: Only administrators can delete products.', 'error');
+        return;
+    }
+    const productToDelete = products.find(p => p.id === productId);
+    if (productToDelete) {
+        setProducts(prev => prev.filter(p => p.id !== productId));
+        addAuditLog('Product Removal', `Admin ${user.fullName} removed product "${productToDelete.name}" (ID: ${productId}). Reason: ${reason}.`, user);
+        showNotification(`Product "${productToDelete.name}" has been removed.`, 'success');
+    }
+  }, [user, products, addAuditLog, showNotification]);
 
   return (
     <AppContext.Provider
@@ -466,9 +475,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         notification, showNotification,
         products,
         currency, setCurrency, formatPrice,
-        user, login, logout, signupActual, forgotPassword, updateUserProfile,
+        user, login, logout, signupActual,
+        updateUserProfile,
         placeOrder, customerOrders, allOrders: orders,
-        farmerProducts, farmerOrders, farmerAddProduct, farmerUpdateProduct, farmerDeleteProduct,
+        farmerProducts, farmerOrders, farmerAddProduct, farmerUpdateProduct,
         allUsers, farmersList, adminUpdateUserStatus, adminAddProduct, adminUpdateProduct, adminDeleteProduct,
         auditLogs, addAuditLog,
       }}

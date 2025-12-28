@@ -4,23 +4,32 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { useLanguage } from '../context/LanguageContext';
 import { FarmerType, UserRole, PendingUserSignupData } from '../types';
-import { EyeIcon, EyeSlashIcon } from '../components/icons';
+import { EyeIcon, EyeSlashIcon, UserCircleIcon, SparklesIcon } from '../components/icons';
 
 
 const FarmerRegistrationPage: React.FC = () => {
     const { t } = useLanguage();
     const navigate = useNavigate();
-    const { signupActual } = useAppContext(); // Directly use signupActual
+    const { signupActual, showNotification, user } = useAppContext();
+
+    // If user is already logged in, redirect to dashboard
+    useEffect(() => {
+        if (user) {
+            navigate('/dashboard', { replace: true });
+        }
+    }, [user, navigate]);
 
     const [formData, setFormData] = useState<PendingUserSignupData>({
         fullName: '',
+        farmName: '',
         email: '',
         mobile: '',
         password: '',
         confirmPassword: '',
         farmLocation: '',
         farmerType: FarmerType.Mixed,
-        role: UserRole.Farmer // Default for this form
+        role: UserRole.Farmer,
+        profilePhoto: '',
     });
     const [error, setError] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -30,13 +39,32 @@ const FarmerRegistrationPage: React.FC = () => {
         setFormData({ ...formData, [name]: value });
     };
 
+    const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            if (file.size > 2 * 1024 * 1024) {
+                showNotification('Image size must be less than 2MB.', 'error');
+                return;
+            }
+            if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+                showNotification('Only JPEG, PNG and WEBP formats are supported.', 'error');
+                return;
+            }
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setFormData(prev => ({ ...prev, profilePhoto: reader.result as string }));
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
 
         // Validation
-        if (!formData.fullName || !formData.email || !formData.mobile || !formData.password || !formData.confirmPassword || !formData.farmLocation || !formData.farmerType) {
-            setError('All fields are required.');
+        if (!formData.fullName || !formData.email || !formData.mobile || !formData.password || !formData.confirmPassword || !formData.farmLocation || !formData.farmerType || !formData.farmName) {
+            setError('All fields except profile photo are required.');
             return;
         }
         if (!/\S+@\S+\.\S+/.test(formData.email)) {
@@ -56,9 +84,7 @@ const FarmerRegistrationPage: React.FC = () => {
             return;
         }
         
-        // Directly call signupActual
         signupActual(formData);
-        navigate('/auth'); // Redirect to login after successful registration
     };
 
   return (
@@ -79,9 +105,31 @@ const FarmerRegistrationPage: React.FC = () => {
             
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-4 animate-fade-in">
-                    <Input name="fullName" type="text" label="Full Name" value={formData.fullName} onChange={handleChange} required />
-                    <Input name="email" type="email" label="Email Address" value={formData.email} onChange={handleChange} required />
-                    <Input name="mobile" type="tel" label="Phone Number" value={formData.mobile} onChange={handleChange} required />
+                    <div className="flex flex-col items-center mb-6">
+                        <div className="relative group">
+                            {formData.profilePhoto ? (
+                                <img src={formData.profilePhoto} alt="Profile Preview" className="w-32 h-32 rounded-full object-cover border-4 border-primary shadow-lg" />
+                            ) : (
+                                <div className="w-32 h-32 rounded-full bg-gray-100 flex items-center justify-center border-4 border-dashed border-gray-300">
+                                    <UserCircleIcon className="w-16 h-16 text-gray-400" />
+                                </div>
+                            )}
+                            <label className="absolute bottom-0 right-0 bg-primary text-white p-2 rounded-full cursor-pointer shadow-md hover:bg-primary-dark transition-colors">
+                                <SparklesIcon className="w-5 h-5" />
+                                <input type="file" className="hidden" accept="image/*" onChange={handlePhotoChange} />
+                            </label>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-2">Upload Profile Photo (Optional)</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <Input name="fullName" type="text" label="Full Name" value={formData.fullName} onChange={handleChange} required />
+                        <Input name="farmName" type="text" label="Farm Name" value={formData.farmName} onChange={handleChange} required />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <Input name="email" type="email" label="Email Address" value={formData.email} onChange={handleChange} required />
+                        <Input name="mobile" type="tel" label="Phone Number" value={formData.mobile} onChange={handleChange} required />
+                    </div>
                     <div className="relative">
                         <Input name="password" type={showPassword ? "text" : "password"} label="Password (min. 8 characters)" value={formData.password} onChange={handleChange} required />
                         <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 top-6 pr-3 flex items-center text-sm leading-5">
@@ -121,7 +169,7 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 const Input: React.FC<InputProps> = ({ label, ...props}) => (
     <div>
         <label htmlFor={props.name} className="block text-sm font-medium text-gray-700">{label}</label>
-        <input {...props} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm" />
+        <input {...props} className={`mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm`} />
     </div>
 )
 

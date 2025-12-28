@@ -21,7 +21,6 @@ const SidebarButton = ({ icon, label, active, onClick }: { icon: React.ReactNode
 );
 
 // This component acts as a router for the admin page.
-// It enforces authentication and renders the correct view based on the user's owner status.
 export const AdminPage: React.FC = () => {
   const { user } = useAppContext();
   const navigate = useNavigate();
@@ -36,7 +35,7 @@ export const AdminPage: React.FC = () => {
     return null; // or a loading spinner
   }
   
-  if (user.isOwner) {
+  if (user.isOwner || user.role === UserRole.Admin) {
     return <OwnerAdminDashboard />;
   } else {
     return <ReadOnlyDashboard />;
@@ -293,7 +292,10 @@ const ProductManagement = () => {
     const { products, adminAddProduct, adminUpdateProduct, adminDeleteProduct, formatPrice, showNotification, addAuditLog } = useAppContext();
     const { t } = useLanguage();
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+    const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+    const [deleteReason, setDeleteReason] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const productsPerPage = 10;
@@ -330,9 +332,17 @@ const ProductManagement = () => {
         setIsModalOpen(false);
     };
 
-    const handleDelete = (productId: string) => {
-        if (window.confirm(t('admin.confirmDeleteProduct'))) {
-            adminDeleteProduct(productId);
+    const handleDeleteClick = (product: Product) => {
+        setProductToDelete(product);
+        setDeleteReason('');
+        setIsDeleteModalOpen(true);
+    };
+
+    const confirmDelete = () => {
+        if (productToDelete) {
+            adminDeleteProduct(productToDelete.id, deleteReason);
+            setIsDeleteModalOpen(false);
+            setProductToDelete(null);
         }
     };
 
@@ -343,6 +353,34 @@ const ProductManagement = () => {
                     <ProductFormAdmin product={editingProduct} onSave={handleSave} onCancel={() => setIsModalOpen(false)} showNotification={showNotification} t={t} />
                 </Modal>
             )}
+            
+            {/* Delete Confirmation Modal */}
+            {isDeleteModalOpen && productToDelete && (
+                <Modal title="Confirm Product Removal" onClose={() => setIsDeleteModalOpen(false)}>
+                   <div className="space-y-4">
+                       <div className="flex items-center gap-3 p-4 bg-red-50 text-red-800 rounded-lg border border-red-100">
+                           <AlertTriangleIcon className="w-8 h-8" />
+                           <p className="font-semibold">Are you sure you want to remove "{productToDelete.name}" from the platform?</p>
+                       </div>
+                       <p className="text-sm text-gray-600">This action will permanently delete the product and its history. This action cannot be undone.</p>
+                       <div className="pt-2">
+                            <label className="block text-sm font-bold text-gray-700 mb-1">Reason for Removal</label>
+                            <textarea 
+                                value={deleteReason} 
+                                onChange={(e) => setDeleteReason(e.target.value)} 
+                                className="w-full border rounded-lg p-3 text-sm focus:ring-red-500 focus:border-red-500"
+                                placeholder="e.g., Inappropriate content, reported as fake, out of compliance..."
+                                rows={3}
+                            />
+                       </div>
+                       <div className="flex justify-end gap-3 pt-4 border-t">
+                            <button onClick={() => setIsDeleteModalOpen(false)} className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg font-bold">Cancel</button>
+                            <button onClick={confirmDelete} className="px-6 py-2 bg-red-600 text-white rounded-lg font-bold shadow-lg hover:bg-red-700 transition-colors">Confirm Delete</button>
+                       </div>
+                   </div>
+                </Modal>
+            )}
+
             <div className="flex justify-between items-center mb-4">
                 <h2 className="text-2xl font-semibold">{t('admin.productManagement')}</h2>
                 <button onClick={handleAddClick} className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark">
@@ -391,7 +429,7 @@ const ProductManagement = () => {
                                     </td>
                                     <td className="p-3 space-x-2 flex items-center">
                                         <button onClick={() => handleEditClick(p)} className="p-1 text-blue-600 hover:text-blue-800" title={t('admin.editProduct')}><PencilIcon className="w-5 h-5"/></button>
-                                        <button onClick={() => handleDelete(p.id)} className="p-1 text-red-600 hover:text-red-800" title={t('admin.deleteProduct')}><TrashIcon className="w-5 h-5"/></button>
+                                        <button onClick={() => handleDeleteClick(p)} className="p-1 text-red-600 hover:text-red-800" title={t('admin.deleteProduct')}><TrashIcon className="w-5 h-5"/></button>
                                     </td>
                                 </tr>
                             ))}
